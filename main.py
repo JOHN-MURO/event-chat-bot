@@ -123,5 +123,5 @@ def callback():
     return "OK"
 
 if __name__ == "__main__":
-    start_scheduler(line_bot_api)
-    app.run()
+    port = int(os.environ.get("PORT", 5000))  # HerokuのPORTを取得
+    app.run(host="0.0.0.0", port=port)
