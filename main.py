@@ -89,7 +89,55 @@ def get_events_between(start_dt, end_dt):
     ).execute()
     return result.get('items', [])
 
+def parse_delete_message(message):
+    # 【削除】を取り除く
+    content = message.replace("【削除】", "").strip()
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+
+    data = {}
+    for line in lines:
+        if line.startswith("【タイトル】"):
+            data['title'] = line.replace("【タイトル】", "").strip()
+        elif line.startswith("【日付】"):
+            data['date'] = line.replace("【日付】", "").strip()
+        elif line.startswith("【開始時間】"):
+            data['start_time'] = line.replace("【開始時間】", "").strip()
+        elif line.startswith("【内容】"):
+            data['content'] = line.replace("【内容】", "").strip()
+        elif line.startswith("【URL】"):
+            data['url'] = line.replace("【URL】", "").strip()
+    return data
+
+def delete_event_from_data(data):
+    try:
+        year = datetime.now(JST).year
+        month, day = map(int, data['date'].split('/'))
+        time_part = data['start_time']
+        if ':' in time_part:
+            hour, minute = map(int, time_part.split(':'))
+        else:
+            hour = int(time_part)
+            minute = 0
+        start_dt = JST.localize(datetime(year, month, day, hour, minute))
+        end_dt = start_dt + timedelta(hours=1)
+    except Exception as e:
+        return f"日時の形式が正しくありません。エラー: {e}"
+
+    events = get_events_between(start_dt, end_dt)
+    for event in events:
+        if event.get('summary') == data.get('title'):
+            calendar_service.events().delete(calendarId=GOOGLE_CALENDAR_ID, eventId=event['id']).execute()
+            return f"予定「{data.get('title')}」を削除しました。"
+    return "該当する予定が見つかりませんでした。"
+
 def handle_incoming_message(message_text):
+    if message_text.startswith("【削除】"):
+        data = parse_delete_message(message_text)
+        if not data.get('title') or not data.get('date') or not data.get('start_time'):
+            return "削除コマンドの形式が不完全です。タイトル、日付、開始時間を必ず指定してください。"
+        return delete_event_from_data(data)
+
+    # 登録用の既存処理
     if "【タイトル】" not in message_text or "【日付】" not in message_text or "【開始時間】" not in message_text:
         return None
 
