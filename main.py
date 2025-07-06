@@ -76,23 +76,8 @@ def handle_incoming_message(message_text):
         return "予定の形式が正しくありません。例: 【予定】 7/10 14:00 会議"
 
     title, start_str, end_str = parsed
-    description = extract_description(message_text)
-    add_event(title, start_str, end_str, description=description)
+    add_event(title, start_str, end_str, description=message_text)
     return f"予定を登録しました：{title}（{start_str}）"
-
-def extract_description(message):
-    content_match = re.search(r'【内容】(.*?)($|【)', message, re.DOTALL)
-    url_match = re.search(r'【URL】(.*?)($|【)', message, re.DOTALL)
-
-    content = content_match.group(1).strip() if content_match else ""
-    url = url_match.group(1).strip() if url_match else ""
-
-    description = ""
-    if content:
-        description += f"内容：{content}\n"
-    if url:
-        description += f"URL：{url}"
-    return description.strip()
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
