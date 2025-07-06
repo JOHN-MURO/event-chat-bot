@@ -68,17 +68,31 @@ def get_events_between(start_dt, end_dt):
     return result.get('items', [])
 
 def handle_incoming_message(message_text):
-    # 「【予定】」というキーワードがない場合は無視
     if "【予定】" not in message_text:
         return None
 
-    parsed = extract_event_info(message_text)
+    parsed = extract_event_info(message_text.replace("【予定】", "").strip())
     if not parsed:
         return "予定の形式が正しくありません。例: 【予定】 7/10 14:00 会議"
 
     title, start_str, end_str = parsed
-    add_event(title, start_str, end_str)
+    description = extract_description(message_text)
+    add_event(title, start_str, end_str, description=description)
     return f"予定を登録しました：{title}（{start_str}）"
+
+def extract_description(message):
+    content_match = re.search(r'【内容】(.*?)($|【)', message, re.DOTALL)
+    url_match = re.search(r'【URL】(.*?)($|【)', message, re.DOTALL)
+
+    content = content_match.group(1).strip() if content_match else ""
+    url = url_match.group(1).strip() if url_match else ""
+
+    description = ""
+    if content:
+        description += f"内容：{content}\n"
+    if url:
+        description += f"URL：{url}"
+    return description.strip()
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
@@ -93,6 +107,7 @@ def format_events(events, header):
     for e in events:
         start = e['start'].get('dateTime', '')[11:16]
         lines.append(f"{start} - {e['summary']}")
+    lines.append("\nご参加ご希望の方は予定表に調整さんがあればそちらから出欠のご連絡をお願いします。")  # ← 注意文追加
     return '\n'.join(lines)
 
 def notify_week_events(bot):
