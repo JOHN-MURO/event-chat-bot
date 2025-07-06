@@ -35,7 +35,9 @@ calendar_service = build('calendar', 'v3', credentials=creds)
 JST = timezone('Asia/Tokyo')
 
 def extract_event_info(message):
-    # 例: 7/10 14:00 会議 や 7-10 14時 ミーティング など対応
+    # 「【予定】」を除いた本体のみ抽出（例: 7/10 14:00 会議）
+    message = message.replace("【予定】", "").strip()
+
     match = re.search(r'(\d{1,2})[/-](\d{1,2})\s+(\d{1,2})(?::(\d{2}))?\s*(.+)', message)
     if not match:
         return None
@@ -56,17 +58,22 @@ def add_event(summary, start_time_str, end_time_str):
 def get_events_between(start_dt, end_dt):
     result = calendar_service.events().list(
         calendarId=GOOGLE_CALENDAR_ID,
-        timeMin=start_dt.isoformat(),   # 'Z'削除
-        timeMax=end_dt.isoformat(),     # 'Z'削除
+        timeMin=start_dt.isoformat(),  # JST時間をそのまま使う
+        timeMax=end_dt.isoformat(),
         singleEvents=True,
         orderBy='startTime'
     ).execute()
     return result.get('items', [])
 
 def handle_incoming_message(message_text):
+    # 「【予定】」というキーワードがない場合は無視
+    if "【予定】" not in message_text:
+        return None
+
     parsed = extract_event_info(message_text)
     if not parsed:
-        return None
+        return "予定の形式が正しくありません。例: 【予定】 7/10 14:00 会議"
+
     title, start_str, end_str = parsed
     add_event(title, start_str, end_str)
     return f"予定を登録しました：{title}（{start_str}）"
