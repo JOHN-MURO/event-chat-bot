@@ -35,26 +35,48 @@ calendar_service = build('calendar', 'v3', credentials=creds)
 JST = timezone('Asia/Tokyo')
 
 def extract_event_info(message):
-    message = message.replace("【予定】", "").strip()
-    match = re.search(r'(\d{1,2})[/-](\d{1,2})\s+(\d{1,2})(?::(\d{2}))?\s*(.+)', message)
-    if not match:
+    # 各項目を正規表現で抽出
+    title_match = re.search(r'【タイトル】(.+)', message)
+    date_match = re.search(r'【日付】(\d{1,2})[/-](\d{1,2})', message)
+    start_time_match = re.search(r'【開始時間】(\d{1,2}):(\d{2})', message)
+    content_match = re.search(r'【内容】(.+)', message)
+    url_match = re.search(r'【URL】(.+)', message)
+
+    if not (title_match and date_match and start_time_match):
         return None
-    month, day, hour, minute, title = match.groups()
-    minute = minute or '00'
+
+    title = title_match.group(1).strip()
+    month = int(date_match.group(1))
+    day = int(date_match.group(2))
+    hour = int(start_time_match.group(1))
+    minute = int(start_time_match.group(2))
+
+    content = content_match.group(1).strip() if content_match else ""
+    url = url_match.group(1).strip() if url_match else ""
+
+    # 日付時刻をTokyo timezoneで作成
     year = datetime.now(JST).year
-
-    # 修正前: dt = datetime(year, int(month), int(day), int(hour), int(minute), tzinfo=JST)
-    naive_dt = datetime(year, int(month), int(day), int(hour), int(minute))
+    naive_dt = datetime(year, month, day, hour, minute)
     dt = JST.localize(naive_dt)
+    start_str = dt.isoformat()
+    end_str = (dt + timedelta(hours=1)).isoformat()
 
-    return title, dt.isoformat(), (dt + timedelta(hours=1)).isoformat()
+    # 説明は内容＋URLを結合して作成
+    description = content
+    if url:
+        description += "\nURL: " + url
 
-def add_event(summary, start_time_str, end_time_str):
+    return title, start_str, end_str, description
+
+
+def add_event(summary, start_time_str, end_time_str, description=None):
     event = {
         'summary': summary,
         'start': {'dateTime': start_time_str, 'timeZone': 'Asia/Tokyo'},
         'end': {'dateTime': end_time_str, 'timeZone': 'Asia/Tokyo'}
     }
+    if description:
+        event['description'] = description
     calendar_service.events().insert(calendarId=GOOGLE_CALENDAR_ID, body=event).execute()
 
 def get_events_between(start_dt, end_dt):
@@ -68,15 +90,15 @@ def get_events_between(start_dt, end_dt):
     return result.get('items', [])
 
 def handle_incoming_message(message_text):
-    if "【予定】" not in message_text:
+    if "【タイトル】" not in message_text or "【日付】" not in message_text or "【開始時間】" not in message_text:
         return None
 
-    parsed = extract_event_info(message_text.replace("【予定】", "").strip())
+    parsed = extract_event_info(message_text)
     if not parsed:
-        return "予定の形式が正しくありません。例: 【予定】 7/10 14:00 会議"
+        return "予定の形式が正しくありません。例:\n【タイトル】会議\n【日付】7/10\n【開始時間】14:00\n【内容】説明\n【URL】https://..."
 
-    title, start_str, end_str = parsed
-    add_event(title, start_str, end_str, description=message_text)
+    title, start_str, end_str, description = parsed
+    add_event(title, start_str, end_str, description=description)
     return f"予定を登録しました：{title}（{start_str}）"
 
 @handler.add(MessageEvent, message=TextMessage)
