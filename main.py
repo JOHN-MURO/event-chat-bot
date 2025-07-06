@@ -35,16 +35,18 @@ calendar_service = build('calendar', 'v3', credentials=creds)
 JST = timezone('Asia/Tokyo')
 
 def extract_event_info(message):
-    # 「【予定】」を除いた本体のみ抽出（例: 7/10 14:00 会議）
     message = message.replace("【予定】", "").strip()
-
     match = re.search(r'(\d{1,2})[/-](\d{1,2})\s+(\d{1,2})(?::(\d{2}))?\s*(.+)', message)
     if not match:
         return None
     month, day, hour, minute, title = match.groups()
     minute = minute or '00'
     year = datetime.now(JST).year
-    dt = datetime(year, int(month), int(day), int(hour), int(minute), tzinfo=JST)
+
+    # 修正前: dt = datetime(year, int(month), int(day), int(hour), int(minute), tzinfo=JST)
+    naive_dt = datetime(year, int(month), int(day), int(hour), int(minute))
+    dt = JST.localize(naive_dt)
+
     return title, dt.isoformat(), (dt + timedelta(hours=1)).isoformat()
 
 def add_event(summary, start_time_str, end_time_str):
@@ -95,16 +97,16 @@ def format_events(events, header):
 
 def notify_week_events(bot):
     today = datetime.now(JST)
-    start = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=JST)
+    start = JST.localize(datetime(today.year, today.month, today.day, 0, 0, 0))
     end_date = today + timedelta(days=6 - today.weekday())
-    end = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=JST)
+    end = JST.localize(datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59))
     events = get_events_between(start, end)
     msg = format_events(events, "【今週の予定】")
     bot.push_message(LINE_GROUP_ID, TextSendMessage(text=msg))
 
 def notify_tomorrow_events(bot):
     tomorrow = datetime.now(JST) + timedelta(days=1)
-    start = datetime(tomorrow.year, tomorrow.month, tomorrow.day, tzinfo=JST)
+    start = JST.localize(datetime(tomorrow.year, tomorrow.month, tomorrow.day))
     end = start + timedelta(days=1)
     events = get_events_between(start, end)
     msg = format_events(events, "【明日の予定】")
