@@ -56,8 +56,8 @@ def add_event(summary, start_time_str, end_time_str):
 def get_events_between(start_dt, end_dt):
     result = calendar_service.events().list(
         calendarId=GOOGLE_CALENDAR_ID,
-        timeMin=start_dt.isoformat() + 'Z',
-        timeMax=end_dt.isoformat() + 'Z',
+        timeMin=start_dt.isoformat(),   # 'Z'削除
+        timeMax=end_dt.isoformat(),     # 'Z'削除
         singleEvents=True,
         orderBy='startTime'
     ).execute()
@@ -88,8 +88,9 @@ def format_events(events, header):
 
 def notify_week_events(bot):
     today = datetime.now(JST)
-    start = today
-    end = today + timedelta(days=7 - today.weekday())
+    start = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=JST)
+    end_date = today + timedelta(days=6 - today.weekday())
+    end = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=JST)
     events = get_events_between(start, end)
     msg = format_events(events, "【今週の予定】")
     bot.push_message(LINE_GROUP_ID, TextSendMessage(text=msg))
@@ -122,6 +123,6 @@ def callback():
         abort(400)
     return "OK"
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # HerokuのPORTを取得
-    app.run(host="0.0.0.0", port=port)
+#if __name__ == "__main__":
+#   port = int(os.environ.get("PORT", 5000))  # HerokuのPORTを取得
+#    app.run(host="0.0.0.0", port=port)
