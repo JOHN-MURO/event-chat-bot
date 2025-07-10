@@ -212,21 +212,15 @@ def callback():
         abort(400)
     return "OK"
 
-# ✅ 週次通知テスト用
 @app.route("/notify_week", methods=['GET'])
 def notify_week():
-    # ここに週次通知処理を直接書くか、
-    # 関数を呼び出す
-    print("手動で /notify_week が呼ばれました")
+    notify_week_events(line_bot_api)
     return "Weekly notification executed!"
 
-# ✅ 週次通知テスト用
 @app.route("/notify_tomorrow", methods=['GET'])
 def notify_tomorrow():
-    # ここに前日通知処理を直接書くか、
-    # 関数を呼び出す
-    print("手動で /notify_week が呼ばれました")
-    return "Weekly notification executed!"
+    notify_tomorrow_events(line_bot_api)
+    return "Tomorrow's notification executed!"
 
 if __name__ == "__main__":
     start_scheduler(line_bot_api)
