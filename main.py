@@ -35,7 +35,6 @@ calendar_service = build('calendar', 'v3', credentials=creds)
 JST = timezone('Asia/Tokyo')
 
 def extract_event_info(message):
-    # 各項目を正規表現で抽出
     title_match = re.search(r'【タイトル】(.+)', message)
     date_match = re.search(r'【日付】(\d{1,2})[/-](\d{1,2})', message)
     start_time_match = re.search(r'【開始時間】(\d{1,2}):(\d{2})', message)
@@ -54,20 +53,17 @@ def extract_event_info(message):
     content = content_match.group(1).strip() if content_match else ""
     url = url_match.group(1).strip() if url_match else ""
 
-    # 日付時刻をTokyo timezoneで作成
     year = datetime.now(JST).year
     naive_dt = datetime(year, month, day, hour, minute)
     dt = JST.localize(naive_dt)
     start_str = dt.isoformat()
     end_str = (dt + timedelta(hours=1)).isoformat()
 
-    # 説明は内容＋URLを結合して作成
     description = content
     if url:
         description += "\nURL: " + url
 
     return title, start_str, end_str, description
-
 
 def add_event(summary, start_time_str, end_time_str, description=None):
     event = {
@@ -82,7 +78,7 @@ def add_event(summary, start_time_str, end_time_str, description=None):
 def get_events_between(start_dt, end_dt):
     result = calendar_service.events().list(
         calendarId=GOOGLE_CALENDAR_ID,
-        timeMin=start_dt.isoformat(),  # JST時間をそのまま使う
+        timeMin=start_dt.isoformat(),
         timeMax=end_dt.isoformat(),
         singleEvents=True,
         orderBy='startTime'
@@ -90,7 +86,6 @@ def get_events_between(start_dt, end_dt):
     return result.get('items', [])
 
 def parse_delete_message(message):
-    # 【削除】を取り除く
     content = message.replace("【削除】", "").strip()
     lines = [line.strip() for line in content.splitlines() if line.strip()]
 
@@ -137,13 +132,13 @@ def handle_incoming_message(message_text):
             return "削除コマンドの形式が不完全です。タイトル、日付、開始時間を必ず指定してください。"
         return delete_event_from_data(data)
 
-    # 登録用の既存処理
     if "【タイトル】" not in message_text or "【日付】" not in message_text or "【開始時間】" not in message_text:
         return None
 
     parsed = extract_event_info(message_text)
     if not parsed:
-        return "予定の形式が正しくありません。例:\n【タイトル】会議\n【日付】7/10\n【開始時間】14:00\n【内容】説明\n【URL】https://..."
+        return ("予定の形式が正しくありません。例:\n"
+                "【タイトル】会議\n【日付】7/10\n【開始時間】14:00\n【内容】説明\n【URL】https://...")
 
     title, start_str, end_str, description = parsed
     add_event(title, start_str, end_str, description=description)
@@ -162,7 +157,7 @@ def format_events(events, header):
     for e in events:
         start = e['start'].get('dateTime', '')[11:16]
         lines.append(f"{start} - {e['summary']}")
-    lines.append("\nご参加ご希望の方は予定表に調整さんがあればそちらから出欠のご連絡をお願いします。")  # ← 注意文追加
+    lines.append("\nご参加ご希望の方は予定表に調整さんがあればそちらから出欠のご連絡をお願いします。")
     return '\n'.join(lines)
 
 def notify_week_events(bot):
@@ -188,23 +183,13 @@ def start_scheduler(line_bot_api):
     scheduler.add_job(lambda: notify_tomorrow_events(line_bot_api), 'cron', hour=20)
     scheduler.start()
 
-#@app.route("/test/notify_week")
-#def test_notify_week():
-#    notify_week_events(line_bot_api)
-#    return "Weekly reminder sent!"
-
-#@app.route("/test/notify_tomorrow")
-#def test_notify_tomorrow():
-#    notify_tomorrow_events(line_bot_api)
-#    return "Tomorrow's reminder sent!"
-
 @app.route("/")
 def index():
     return "LINE Google Calendar Bot is running!"
 
 @app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers["X-Line-Signature"]
+    signature = request.headers.get("X-Line-Signature")
     body = request.get_data(as_text=True)
     try:
         handler.handle(body, signature)
@@ -212,15 +197,27 @@ def callback():
         abort(400)
     return "OK"
 
+# --- 修正版：関数名を変更して重複を防ぎ、必ず通知関数を呼ぶ ---
+
 @app.route("/notify_week", methods=['GET'])
-def notify_week():
+def notify_week_route():
     notify_week_events(line_bot_api)
     return "Weekly notification executed!"
 
 @app.route("/notify_tomorrow", methods=['GET'])
-def notify_tomorrow():
+def notify_tomorrow_route():
     notify_tomorrow_events(line_bot_api)
-    return "Tomorrow's notification executed!"
+    return "Tomorrow notification executed!"
+
+@app.route("/test/notify_week")
+def test_notify_week_route():
+    notify_week_events(line_bot_api)
+    return "Test weekly reminder sent!"
+
+@app.route("/test/notify_tomorrow")
+def test_notify_tomorrow_route():
+    notify_tomorrow_events(line_bot_api)
+    return "Test tomorrow reminder sent!"
 
 if __name__ == "__main__":
     start_scheduler(line_bot_api)
