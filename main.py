@@ -212,13 +212,21 @@ def callback():
         abort(400)
     return "OK"
 
-@app.route('/notify_week', methods=['GET'])
+# ✅ 週次通知テスト用
+@app.route("/notify_week", methods=['GET'])
 def notify_week():
-    return "週次通知テストです！"
+    # ここに週次通知処理を直接書くか、
+    # 関数を呼び出す
+    print("手動で /notify_week が呼ばれました")
+    return "Weekly notification executed!"
 
-@app.route('/notify_tommorow', methods=['GET'])
+# ✅ 週次通知テスト用
+@app.route("/notify_tomorrow", methods=['GET'])
 def notify_tomorrow():
-    return "前日通知テストです！"
+    # ここに前日通知処理を直接書くか、
+    # 関数を呼び出す
+    print("手動で /notify_week が呼ばれました")
+    return "Weekly notification executed!"
 
 if __name__ == "__main__":
     start_scheduler(line_bot_api)
