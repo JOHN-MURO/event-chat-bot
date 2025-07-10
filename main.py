@@ -188,6 +188,16 @@ def start_scheduler(line_bot_api):
     scheduler.add_job(lambda: notify_tomorrow_events(line_bot_api), 'cron', hour=20)
     scheduler.start()
 
+@app.route("/test/notify_week")
+def test_notify_week():
+    notify_week_events(line_bot_api)
+    return "Weekly reminder sent!"
+
+@app.route("/test/notify_tomorrow")
+def test_notify_tomorrow():
+    notify_tomorrow_events(line_bot_api)
+    return "Tomorrow's reminder sent!"
+
 @app.route("/")
 def index():
     return "LINE Google Calendar Bot is running!"
@@ -201,6 +211,14 @@ def callback():
     except InvalidSignatureError:
         abort(400)
     return "OK"
+
+@app.route('/notify_week', methods=['GET'])
+def notify_week():
+    return "週次通知テストです！"
+
+@app.route('/notify_tommorow', methods=['GET'])
+def notify_tomorrow():
+    return "前日通知テストです！"
 
 if __name__ == "__main__":
     start_scheduler(line_bot_api)
